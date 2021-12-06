@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -24,28 +23,29 @@ func New(dbName string) (*DB, error) {
 
 func (db *DB) CreateTable(table Table) error {
 	_, err := db.Exec(
-		fmt.Sprintf(`CREATE TABLE %s %s`, table.Name, table.Scheme),
+		fmt.Sprintf(`CREATE TABLE %s (%s)`, table.Name, table.Scheme),
 	)
 	return err
 }
 
-func (db *DB) 
+// func (db *DB) InsertRows(table Table) error {
+// }
 
-func main() {
-	db, err := sql.Open(`sqlite3`, `./foo.db`)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	_, err = db.Exec(
-		fmt.Sprintf(`CREATE TABLE % %`),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	res, err := db.Exec(
-
-	)
-
-}
+// func main() {
+// 	db, err := sql.Open(`sqlite3`, `./foo.db`)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 
+// 	_, err = db.Exec(
+// 		fmt.Sprintf(`CREATE TABLE % %`),
+// 	)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 
+// 	res, err := db.Exec(
+// 
+// 	)
+// 
+// }
