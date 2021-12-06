@@ -17,24 +17,19 @@ type Table struct {
 	Scheme string
 }
 
-func NewDB(dbName string) (*DB, error) {
+func New(dbName string) (*DB, error) {
 	db, err := sql.Open(`sqlite3`, dbName)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
+	return &DB{DB: db}, err
 }
 
-func (*DB) CreateTable(table Table) {
-	_, err = db.Exec(
-		fmt.Sprintf(`CREATE TABLE %s %s`),
+func (db *DB) CreateTable(table Table) error {
+	_, err := db.Exec(
+		fmt.Sprintf(`CREATE TABLE %s %s`, table.Name, table.Scheme),
 	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	return err
 }
+
+func (db *DB) 
 
 func main() {
 	db, err := sql.Open(`sqlite3`, `./foo.db`)
