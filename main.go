@@ -13,42 +13,66 @@ type DB struct {
 }
 
 type Table struct {
+	*DB
 	Name   string
 	Scheme string
 }
 
-func New(dbName string) (*DB, error) {
+func NewDB(dbName string) (*DB, error) {
 	db, err := sql.Open(`sqlite3`, dbName)
 	return &DB{DB: db}, err
 }
 
-func (db *DB) CreateTable(table Table) error {
+func (db *DB) CreateTable(name string, scheme string) (Table, error) {
 	_, err := db.Exec(
-		fmt.Sprintf(`CREATE TABLE %s`, table.Name),
+		fmt.Sprintf(`CREATE TABLE %s %s`, name, scheme),
 	)
-	return err
+	return Table{DB: db, Name: name, Scheme: scheme}, err
+}
+
+func castTypes(strs []string) []interface{} {
+	ifaces := make([]interface{}, len(strs))
+
+	for i, str := range strs {
+		// check type
+		switch
+		//ifaces[i] = str
+	}
+	return ifaces
+}
+
+func (table Table) InsertRows(rows [][]string) error {
+	for _, row := range rows {
+		ifs := make([]interface{}, len(row))
+		_, err := table.Exec(
+			fmt.Sprintf(`INSERT INTO %s %s VALUES (?, ?)`, table.Name, table.Scheme),
+			ifs...,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func main() {
-	TABLE_NAME := "hoge_tb"
-	SCHEME := "(col1, col2)"
-
-	db, err := sql.Open(`sqlite3`, `./foo.db`)
+	db, err := NewDB(`./foo.db`)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
-	_, err = db.Exec(
-		fmt.Sprintf(`CREATE TABLE %s %s`, TABLE_NAME, SCHEME),
-	)
+	table, err := db.CreateTable("test_tb", "(col1, col2)")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	_, err = db.Exec(
-		fmt.Sprintf(`INSERT INTO %s (col1, col2) VALUES (?, ?)`, TABLE_NAME),
-		"123",
-		"text",
-	)
+	err = table.InsertRows([][]string{
+		{"foo1", "bar1"},
+		{"foo2", "bar2"},
+		{"foo3", "bar3"},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 }
