@@ -1,11 +1,8 @@
-package main
+package csv2sqlite
 
 import (
 	"database/sql"
-	"encoding/csv"
 	"fmt"
-	"log"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -50,7 +47,7 @@ func castTypes(strs []string) []interface{} {
 	return ifaces
 }
 
-func validTableScheme(schemeStr string) bool {
+func ValidTableScheme(schemeStr string) bool {
 	match, err := regexp.MatchString(`^\(.+, *.+\)$`, schemeStr)
 	if err != nil {
 		return false
@@ -59,11 +56,11 @@ func validTableScheme(schemeStr string) bool {
 }
 
 // TODO: escape "(", ")", ",", and so on.
-func genTableScheme(strs []string) string {
+func GenTableScheme(strs []string) string {
 	return fmt.Sprintf("(%s)", strings.Join(strs, ","))
 }
 
-func genTableQParams(scheme string) string {
+func GenTableQParams(scheme string) string {
 	qParams := ""
 	schemeArr := strings.Split(scheme, ",")
 	for i := 0; i < len(schemeArr); i++ {
@@ -77,14 +74,14 @@ func genTableQParams(scheme string) string {
 }
 
 func (db *DB) CreateTable(name string, scheme string) (Table, error) {
-	if !validTableScheme(scheme) {
+	if !ValidTableScheme(scheme) {
 		return Table{}, fmt.Errorf("invalid scheme")
 	}
 
 	_, err := db.Exec(
 		fmt.Sprintf(`CREATE TABLE %s %s`, name, scheme),
 	)
-	return Table{DB: db, Name: name, Scheme: scheme, QParams: genTableQParams(scheme)}, err
+	return Table{DB: db, Name: name, Scheme: scheme, QParams: GenTableQParams(scheme)}, err
 }
 
 
@@ -100,36 +97,4 @@ func (table Table) InsertRows(rows [][]string) error {
 		}
 	}
 	return nil
-}
-
-func main() {
-	csvFile, err := os.Open("./main_test.csv")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer csvFile.Close()
-
-	db, err := NewDB(`./main_test.db`)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	reader := csv.NewReader(csvFile)
-	rows, err := reader.ReadAll()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	scheme := genTableScheme(rows[0])
-
-	table, err := db.CreateTable("test_tb", scheme)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = table.InsertRows(rows[1:])
-	if err != nil {
-		log.Fatal(err)
-	}
 }
