@@ -10,7 +10,8 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func isExistDup(strs []string) bool {
+// check duplicate table name
+func checkDupTable(strs []string) bool {
 	strMap := make(map[string]struct{})
 	for _, str := range strs {
 		strMap[str] = struct{}{}
@@ -21,20 +22,25 @@ func isExistDup(strs []string) bool {
 func main() {
 	app := &cli.App{
 		Name:  "csv2sqlite",
-		Usage: "$ csv2sqlite -d ./hoge.db -t fuga_tb -c ./fuga.csv",
+		Usage: "$ csv2sqlite -t hoge_tb -c ./hoge.csv -d ./dump.db",
 		Flags: []cli.Flag {
 			&cli.StringFlag{
-				Name: "db, d",
-				Value: "dump.db",
-				Usage: "-d ./hoge.db",
+				Name: "db",
+				Aliases: []string{"d"},
+				Usage: "-d ./dump.db",
+				Required: true,
 			},
 			&cli.StringSliceFlag{
-				Name:  "table, t",
-				Usage: "-t fuga_tb",
+				Name:  "table",
+				Aliases: []string{"t"},
+				Usage: "-t hoge_tb",
+				Required: true,
 			},
 			&cli.StringSliceFlag{
-				Name:  "csv, c",
-				Usage: "-c ./fuga.csv",
+				Name:  "csv",
+				Aliases: []string{"f"},
+				Usage: "-c ./hoge.csv",
+				Required: true,
 			},
 		},
 		Action: func(c *cli.Context) error {
@@ -46,7 +52,7 @@ func main() {
 				return fmt.Errorf("invalid options: only one table for one csv file")
 			}
 
-			if isExistDup(tableNames) {
+			if checkDupTable(tableNames) {
 				return fmt.Errorf("invalid options: each table name must be unique")
 			}
 
@@ -56,28 +62,28 @@ func main() {
 			}
 			defer db.Close()
 
+			for i := range tableNames {
+				csvFile, err := os.Open(csvPaths[i])
+				if err != nil {
+					return err
+				}
+				defer csvFile.Close()
 
-			// loop
-			csvFile, err := os.Open("")
-			if err != nil {
-				return err
-			}
-			defer csvFile.Close()
+				rows, err := csv.NewReader(csvFile).ReadAll()
+				if err != nil {
+					return err
+				}
 
-			reader := csv.NewReader(csvFile)
-			rows, err := reader.ReadAll()
-			if err != nil {
-				return err
-			}
-			scheme := cs.GenTableScheme(rows[0])
-			table, err := db.CreateTable("test_tb", scheme)
-			if err != nil {
-				return err
-			}
+				scheme := cs.GenTableScheme(rows[0])
+				table, err := db.CreateTable(tableNames[i], scheme)
+				if err != nil {
+					return err
+				}
 
-			err = table.InsertRows(rows[1:])
-			if err != nil {
-				return err
+				err = table.InsertRows(rows[1:])
+				if err != nil {
+					return err
+				}
 			}
 
 			return nil
