@@ -20,11 +20,7 @@ func checkDupTable(strs []string) bool {
 	return len(strMap) != len(strs)
 }
 
-func actionWithOptions(c *cli.Context) error {
-	dbName := c.String("db")
-	tableNames := c.StringSlice("table")
-	csvPaths := c.StringSlice("csv")
-
+func action(tableNames, csvPaths []string, dbName string) error {
 	if len(tableNames) != len(csvPaths) {
 		return fmt.Errorf("invalid options: only one table for one csv file")
 	}
@@ -51,7 +47,7 @@ func actionWithOptions(c *cli.Context) error {
 			return err
 		}
 
-		scheme := cs.GenTableScheme(rows[0])
+		scheme := cs.GenTableScheme(rows[0], rows[1])
 		table, err := db.CreateTable(tableNames[i], scheme)
 		if err != nil {
 			return err
@@ -66,45 +62,18 @@ func actionWithOptions(c *cli.Context) error {
 	return nil
 }
 
-func actionWithNoOptions(csvPath string) error {
-	csvFile, err := os.Open(csvPath)
-	if err != nil {
-		return err
-	}
-	defer csvFile.Close()
-
-	rows, err := csv.NewReader(csvFile).ReadAll()
-	if err != nil {
-		return err
-	}
-
-	// name of the input csv file (excluding the ext)
-	csvFileName := filepath.Base(csvPath[:len(csvPath)-len(filepath.Ext(csvPath))])
-
-	db, err := cs.NewDB(fmt.Sprintf("./%s.db", csvFileName))
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	scheme := cs.GenTableScheme(rows[0])
-	table, err := db.CreateTable(csvFileName, scheme)
-	if err != nil {
-		return err
-	}
-
-	err = table.InsertRows(rows[1:])
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func main() {
 	// no options mode
 	if len(os.Args) == 2 {
-		err := actionWithNoOptions(os.Args[1])
+		csvPath := os.Args[1]
+		// name of the input csv file (excluding the ext)
+		csvFileName := filepath.Base(csvPath[:len(csvPath)-len(filepath.Ext(csvPath))])
+
+		tableNames := []string{csvFileName}
+		csvPaths := []string{csvPath}
+		dbName := csvFileName + ".db"
+
+		err := action(tableNames, csvPaths, dbName)
 		if err != nil {
 			log.Fatal(err)
 		} else {
@@ -116,27 +85,31 @@ func main() {
 		Name:  "csv2sqlite",
 		Usage: "$ csv2sqlite -t hoge_tb -c ./hoge.csv -d ./dump.db",
 		Flags: []cli.Flag {
+			&cli.StringSliceFlag{
+				Name: "table",
+				Aliases: []string{"t"},
+				Usage: "-t hoge_tb",
+				Required: true,
+			},
+			&cli.StringSliceFlag{
+				Name: "csv",
+				Aliases: []string{"c"},
+				Usage: "-c ./hoge.csv",
+				Required: true,
+			},
 			&cli.StringFlag{
 				Name: "db",
 				Aliases: []string{"d"},
 				Usage: "-d ./dump.db",
 				Required: true,
 			},
-			&cli.StringSliceFlag{
-				Name:  "table",
-				Aliases: []string{"t"},
-				Usage: "-t hoge_tb",
-				Required: true,
-			},
-			&cli.StringSliceFlag{
-				Name:  "csv",
-				Aliases: []string{"f"},
-				Usage: "-c ./hoge.csv",
-				Required: true,
-			},
 		},
 		Action: func(c *cli.Context) error {
-			return actionWithOptions(c)
+			dbName := c.String("db")
+			tableNames := c.StringSlice("table")
+			csvPaths := c.StringSlice("csv")
+
+			return action(tableNames, csvPaths, dbName)
 		},
 	}
 

@@ -3,10 +3,11 @@ package csv2sqlite
 import (
 	"database/sql"
 	"fmt"
-	"regexp"
+	"reflect"
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	_ "modernc.org/sqlite"
 )
 
@@ -26,38 +27,46 @@ func NewDB(dbName string) (*DB, error) {
 	return &DB{DB: db}, err
 }
 
+func castType(str string) interface{} {
+	toInt, err := strconv.ParseInt(str, 10, 64)
+	if err == nil {
+		return toInt
+	}
+	
+	toFloat, err := strconv.ParseFloat(str, 64)
+	if err == nil {
+		return toFloat
+	}
+
+	return str
+}
+
 func castTypes(strs []string) []interface{} {
 	ifaces := make([]interface{}, len(strs))
 
 	for i, str := range strs {
-		toInt, err := strconv.ParseInt(str, 10, 64)
-		if err == nil {
-			ifaces[i] = toInt
-			continue
-		}
-		
-		toFloat, err := strconv.ParseFloat(str, 64)
-		if err == nil {
-			ifaces[i] = toFloat
-			continue
-		}
-
-		ifaces[i] = str
+		ifaces[i] = castType(str)
 	}
 	return ifaces
 }
 
-func ValidTableScheme(schemeStr string) bool {
-	match, err := regexp.MatchString(`^\(.+, *.+\)$`, schemeStr)
-	if err != nil {
-		return false
-	}
-	return match
-}
-
 // TODO: escape "(", ")", ",", and so on.
-func GenTableScheme(strs []string) string {
-	return fmt.Sprintf("(%s)", strings.Join(strs, ","))
+func GenTableScheme(header []string, sampleRow []string) string {
+	cols := []string{}
+
+	for i := range header {
+		rt := reflect.TypeOf(castType(sampleRow[i]))
+		switch rt.Kind() {
+		case reflect.Int64:
+			cols = append(cols, fmt.Sprintf("%s %s", header[i], "INTEGER"))
+		case reflect.Float64:
+			cols = append(cols, fmt.Sprintf("%s %s", header[i], "REAL"))
+		case reflect.String:
+			cols = append(cols, fmt.Sprintf("%s %s", header[i], "TEXT"))
+		}
+	}
+
+	return fmt.Sprintf("(%s)", strings.Join(cols, ","))
 }
 
 func GenTableQParams(scheme string) string {
@@ -70,30 +79,24 @@ func GenTableQParams(scheme string) string {
 			qParams += "?,"
 		}
 	}
-	return "(" + qParams + ")"
+	return fmt.Sprintf("(%s)", qParams)
 }
 
 func (db *DB) CreateTable(name string, scheme string) (Table, error) {
-	if !ValidTableScheme(scheme) {
-		return Table{}, fmt.Errorf("invalid scheme")
-	}
-
 	_, err := db.Exec(
 		fmt.Sprintf(`CREATE TABLE %s %s`, name, scheme),
 	)
-	return Table{DB: db, Name: name, Scheme: scheme, QParams: GenTableQParams(scheme)}, err
+	return Table{DB: db, Name: name, Scheme: scheme, QParams: GenTableQParams(scheme)}, errors.WithMessage(err, "SQLite: CREATE TABLE error")
 }
-
 
 func (table Table) InsertRows(rows [][]string) error {
 	for _, row := range rows {
-		ifs := castTypes(row)
 		_, err := table.Exec(
-			fmt.Sprintf(`INSERT INTO %s %s VALUES %s`, table.Name, table.Scheme, table.QParams),
-			ifs...,
+			fmt.Sprintf(`INSERT INTO %s VALUES %s`, table.Name, table.QParams),
+			castTypes(row)...,
 		)
 		if err != nil {
-			return err
+			return errors.WithMessage(err, "SQLite: INSERT error")
 		}
 	}
 	return nil
