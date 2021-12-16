@@ -28,7 +28,7 @@ Useful in combination with drag-and-drop or shortcuts
 ## Installation
 
 ```
-$ go get github.com/dono/csv2sqlite
+$ go install github.com/dono/csv2sqlite/cmd/csv2sqlite@latest
 ```
 
 ## License
